@@ -1,3 +1,7 @@
+"""Storage functions for Postgres and Blob Storage."""
+
+import json
+import logging
 import os
 from contextlib import closing
 from datetime import datetime, timezone
@@ -11,42 +15,46 @@ log = logging.getLogger(__name__)
 
 
 def insert_readings(df: pd.DataFrame) -> None:
-    """Insert a DataFrame of readings into Postgres.
-
-    Creates the table in your personal schema (DB_SCHEMA env var, e.g. dev_alice).
-    All CREATE TABLE and INSERT statements run inside that schema so your tables
-    never collide with other students on the shared server.
-    """
+    """Insert a DataFrame of weather readings into Postgres."""
     db_url = os.environ["POSTGRES_URL"]
     schema = os.environ.get("DB_SCHEMA", "public")
 
     with closing(psycopg2.connect(db_url)) as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                f"CREATE SCHEMA IF NOT EXISTS {schema}"  # noqa: S608
-            )
+            cur.execute(f"CREATE SCHEMA IF NOT EXISTS {schema}")  # noqa: S608
             cur.execute(f"SET search_path TO {schema}")  # noqa: S608
 
-            # TODO: Replace 'weather_readings' with a name that describes your data.
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS weather_readings (
                     id SERIAL PRIMARY KEY,
                     city TEXT NOT NULL,
+                    timestamp TIMESTAMP NOT NULL,
                     temperature REAL NOT NULL,
                     humidity REAL NOT NULL,
-                    timestamp TEXT NOT NULL
+                    precipitation REAL NOT NULL,
+                    wind_speed REAL NOT NULL,
+                    wind_speed_ms REAL NOT NULL,
+                    is_raining BOOLEAN NOT NULL
                 )
             """)
 
             for _, row in df.iterrows():
                 cur.execute(
-                    "INSERT INTO weather_readings (city, temperature, humidity, timestamp)"
-                    " VALUES (%s, %s, %s, %s)",
+                    """
+                    INSERT INTO weather_readings
+                        (city, timestamp, temperature, humidity,
+                         precipitation, wind_speed, wind_speed_ms, is_raining)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    """,
                     (
                         row["city"],
-                        row["temperature"],
-                        row["humidity"],
-                        row["timestamp"],
+                        row["timestamp"].to_pydatetime(),
+                        float(row["temperature"]),
+                        float(row["humidity"]),
+                        float(row["precipitation"]),
+                        float(row["wind_speed"]),
+                        float(row["wind_speed_ms"]),
+                        bool(row["is_raining"]),
                     ),
                 )
 
