@@ -1,10 +1,11 @@
 """Main pipeline: fetch, validate, transform, store."""
+
 import logging
 import os
 import sys
 
 from dotenv import load_dotenv
-load_dotenv()
+
 
 import pandas as pd
 import requests
@@ -13,6 +14,7 @@ from pydantic import ValidationError
 from src.models import WeatherReading
 from src.storage import insert_readings, upload_raw_json
 
+load_dotenv()
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
@@ -48,16 +50,13 @@ def fetch_data():
         response = requests.get(OPEN_METEO_URL, params=params, timeout=10)
         response.raise_for_status()
 
-        raw_responses.append({
-            "city": city,
-            "data": response.json()
-        })
+        raw_responses.append({"city": city, "data": response.json()})
 
     log.info("Fetched RAW data for %d cities", len(raw_responses))
     return raw_responses
 
 
-#SAVE RAW TO BLOB
+# SAVE RAW TO BLOB
 def save_raw(raw_data):
     upload_raw_json(raw_data)
 
@@ -74,19 +73,21 @@ def process(raw_data):
         times = hourly["time"]
 
         for i, t in enumerate(times):
-            records.append({
-                "city": city,
-                "timestamp": t,
-                "temperature": hourly["temperature_2m"][i],
-                "humidity": hourly["relative_humidity_2m"][i],
-                "precipitation": hourly["precipitation"][i],
-                "wind_speed": hourly["wind_speed_10m"][i],
-            })
+            records.append(
+                {
+                    "city": city,
+                    "timestamp": t,
+                    "temperature": hourly["temperature_2m"][i],
+                    "humidity": hourly["relative_humidity_2m"][i],
+                    "precipitation": hourly["precipitation"][i],
+                    "wind_speed": hourly["wind_speed_10m"][i],
+                }
+            )
 
     return records
 
 
-#VALIDATION (Pydantic)
+# VALIDATION (Pydantic)
 def validate(records):
     valid = []
 
@@ -114,7 +115,6 @@ def transform(readings):
     return df
 
 
-
 # RUN PIPELINE
 def run():
     log.info("Pipeline started")
@@ -132,15 +132,14 @@ def run():
         sys.exit(1)
 
     df = transform(readings)
-    #print(df.head())
-    #df.to_csv("processed_data.csv", index=False)
+    # print(df.head())
+    # df.to_csv("processed_data.csv", index=False)
 
     insert_readings(df)
     log.info("Pipeline finished successfully (%d rows)", len(df))
 
 
 if __name__ == "__main__":
-
     for var in ["POSTGRES_URL", "AZURE_STORAGE_CONNECTION_STRING"]:
         if var not in os.environ:
             log.error("Missing required environment variable: %s", var)
