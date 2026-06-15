@@ -1,18 +1,18 @@
-"""Main pipeline: fetch, validate, store."""
-
+"""Main pipeline: fetch, validate, transform, store."""
 import logging
 import os
 import sys
 
 from dotenv import load_dotenv
-
 load_dotenv()
 
 import pandas as pd
+import requests
 from pydantic import ValidationError
 
 from src.models import WeatherReading
 from src.storage import insert_readings, upload_raw_json
+
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
@@ -22,74 +22,125 @@ logging.getLogger("azure").setLevel(logging.WARNING)
 log = logging.getLogger(__name__)
 
 
-def fetch_data() -> list[dict]:
-    """Fetch data from your API. Replace this with your own logic."""
-    # TODO: Replace with your API call
-    # Example using requests:
-    #   response = requests.get("https://api.open-meteo.com/v1/forecast?...")
-    #   response.raise_for_status()
-    #   return response.json()["hourly"]
-    raise NotImplementedError("Replace this with your API call")
+CITIES = {
+    "Amsterdam": (52.37, 4.89),
+    "Rotterdam": (51.92, 4.48),
+    "Utrecht": (52.09, 5.12),
+}
+
+OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
+HOURLY_VARS = "temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m"
 
 
-def validate(raw_records: list[dict]) -> list[WeatherReading]:
-    """Validate raw records using Pydantic models."""
+def fetch_data():
+    """Fetch RAW API responses (NO processing)."""
+    raw_responses = []
+
+    for city, (lat, lon) in CITIES.items():
+        params = {
+            "latitude": lat,
+            "longitude": lon,
+            "hourly": HOURLY_VARS,
+            "timezone": "UTC",
+            "forecast_days": 1,
+        }
+
+        response = requests.get(OPEN_METEO_URL, params=params, timeout=10)
+        response.raise_for_status()
+
+        raw_responses.append({
+            "city": city,
+            "data": response.json()
+        })
+
+    log.info("Fetched RAW data for %d cities", len(raw_responses))
+    return raw_responses
+
+
+#SAVE RAW TO BLOB
+def save_raw(raw_data):
+    upload_raw_json(raw_data)
+
+
+# process row to flatten
+def process(raw_data):
+    """Convert raw API into structured records."""
+    records = []
+
+    for item in raw_data:
+        city = item["city"]
+        hourly = item["data"]["hourly"]
+
+        times = hourly["time"]
+
+        for i, t in enumerate(times):
+            records.append({
+                "city": city,
+                "timestamp": t,
+                "temperature": hourly["temperature_2m"][i],
+                "humidity": hourly["relative_humidity_2m"][i],
+                "precipitation": hourly["precipitation"][i],
+                "wind_speed": hourly["wind_speed_10m"][i],
+            })
+
+    return records
+
+
+#VALIDATION (Pydantic)
+def validate(records):
     valid = []
-    for record in raw_records:
+
+    for r in records:
         try:
-            valid.append(WeatherReading(**record))
+            valid.append(WeatherReading(**r))
         except ValidationError as e:
-            log.warning("Skipping invalid record: %s", e)
-    log.info("Validated %d / %d records", len(valid), len(raw_records))
+            log.warning("Invalid record skipped: %s", e)
+
+    log.info("Validated %d / %d records", len(valid), len(records))
     return valid
 
 
-def transform(readings: list[WeatherReading]) -> pd.DataFrame:
-    """Convert validated records to a DataFrame and apply transformations.
-
-    This is where pandas earns its place. Replace the examples below with
-    transformations that make sense for your data.
-    """
+# TRANSFORM (Pandas)
+def transform(readings):
     df = pd.DataFrame([r.model_dump() for r in readings])
 
-    # TODO: Replace these with your own transformations. Examples:
-    #
-    # Parse timestamp strings into proper datetime objects:
-    #   df["timestamp"] = pd.to_datetime(df["timestamp"])
-    #
-    # Derive a new column from existing data:
-    #   df["temp_fahrenheit"] = df["temperature"] * 9 / 5 + 32
-    #
-    # Drop rows where a required field is missing:
-    #   df = df.dropna(subset=["temperature"])
-    #
-    # Rename columns to match your Postgres table:
-    #   df = df.rename(columns={"timestamp": "recorded_at"})
+    df["timestamp"] = pd.to_datetime(df["timestamp"])
+    df["is_raining"] = df["precipitation"] > 0
+    df["wind_speed_ms"] = (df["wind_speed"] / 3.6).round(2)
+
+    df = df.dropna(subset=["temperature", "humidity"])
 
     log.info("Transformed %d rows", len(df))
     return df
 
 
+
+# RUN PIPELINE
 def run():
-    """Run the full pipeline: fetch -> validate -> transform -> store."""
-    log.info("Pipeline starting")
+    log.info("Pipeline started")
 
     raw = fetch_data()
-    readings = validate(raw)
+
+    save_raw(raw)  # RAW FIRST
+
+    records = process(raw)  # processing step
+
+    readings = validate(records)
 
     if not readings:
-        log.error("No valid records to store")
+        log.error("No valid data")
         sys.exit(1)
 
     df = transform(readings)
-    insert_readings(df)
-    upload_raw_json(raw)
+    #print(df.head())
+    #df.to_csv("processed_data.csv", index=False)
 
-    log.info("Pipeline finished: %d records stored", len(df))
+    insert_readings(df)
+    log.info("Pipeline finished successfully (%d rows)", len(df))
 
 
 if __name__ == "__main__":
-    # Fail fast if required env vars are missing
+
     for var in ["POSTGRES_URL", "AZURE_STORAGE_CONNECTION_STRING"]:
         if var not in os.environ:
             log.error("Missing required environment variable: %s", var)
