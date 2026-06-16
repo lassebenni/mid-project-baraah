@@ -2,3 +2,5 @@
 __pycache__/
 *.pyc
 .venv/
+scratch.py
+sample_output.csv

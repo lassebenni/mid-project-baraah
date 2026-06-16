@@ -1,15 +1,14 @@
-"""Pydantic models for data validation. Replace with your own."""
+"""Pydantic models for data validation."""
 
 from pydantic import BaseModel, Field
 
 
 class WeatherReading(BaseModel):
-    """Example model. Replace with your own data structure."""
+    """A single hourly weather reading for one city."""
 
     city: str
-    temperature: float = Field(ge=-100, le=100)
-    humidity: float = Field(ge=0, le=100)
     timestamp: str
-
-    # TODO: Replace these fields with the fields from your API response.
-    # Pydantic will reject any record that does not match this schema.
+    temperature: float = Field(ge=-50, le=50)
+    humidity: float = Field(ge=0, le=100)
+    precipitation: float = Field(ge=0, le=500)
+    wind_speed: float = Field(ge=0, le=250)

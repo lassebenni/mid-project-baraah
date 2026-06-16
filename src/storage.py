@@ -21,8 +21,8 @@ def insert_readings(df: pd.DataFrame) -> None:
 
     with closing(psycopg2.connect(db_url)) as conn:
         with conn.cursor() as cur:
-            cur.execute(f"CREATE SCHEMA IF NOT EXISTS {schema}")  # noqa: S608
-            cur.execute(f"SET search_path TO {schema}")  # noqa: S608
+            cur.execute(f"CREATE SCHEMA IF NOT EXISTS {schema}")
+            cur.execute(f"SET search_path TO {schema}")
 
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS weather_readings (
@@ -35,8 +35,8 @@ def insert_readings(df: pd.DataFrame) -> None:
                     wind_speed REAL NOT NULL,
                     wind_speed_ms REAL NOT NULL,
                     is_raining BOOLEAN NOT NULL
-                )
-            """)
+                    )
+                """)
 
             for _, row in df.iterrows():
                 cur.execute(
@@ -45,6 +45,7 @@ def insert_readings(df: pd.DataFrame) -> None:
                         (city, timestamp, temperature, humidity,
                          precipitation, wind_speed, wind_speed_ms, is_raining)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (city, timestamp) DO NOTHING
                     """,
                     (
                         row["city"],

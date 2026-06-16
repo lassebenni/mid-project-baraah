@@ -64,6 +64,7 @@ def save_raw(raw_data):
 # process row to flatten
 def process(raw_data):
     """Convert raw API into structured records."""
+    #
     records = []
 
     for item in raw_data:
@@ -115,15 +116,14 @@ def transform(readings):
     return df
 
 
-# RUN PIPELINE
 def run():
     log.info("Pipeline started")
 
     raw = fetch_data()
 
-    save_raw(raw)  # RAW FIRST
+    save_raw(raw)
 
-    records = process(raw)  # processing step
+    records = process(raw)
 
     readings = validate(records)
 
@@ -132,8 +132,6 @@ def run():
         sys.exit(1)
 
     df = transform(readings)
-    # print(df.head())
-    # df.to_csv("processed_data.csv", index=False)
 
     insert_readings(df)
     log.info("Pipeline finished successfully (%d rows)", len(df))
