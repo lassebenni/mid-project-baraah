@@ -85,7 +85,7 @@ def process(raw_data):
                 }
             )
 
-    return records 
+    return records
 
 
 # VALIDATION (Pydantic)
@@ -114,7 +114,6 @@ def transform(readings):
 
     log.info("Transformed %d rows", len(df))
     return df
-
 
 
 def run():

@@ -22,6 +22,7 @@ from typing import List, Optional, Tuple
 # Result container
 # ---------------------------------------------------------------------------
 
+
 class Result:
     def __init__(self, label, passed, critical, detail=""):
         self.label = label
@@ -89,7 +90,8 @@ def readme_is_filled_in():
     if not readme.exists():
         return False
     non_heading = [
-        line for line in readme.read_text(errors="replace").splitlines()
+        line
+        for line in readme.read_text(errors="replace").splitlines()
         if line.strip() and not line.startswith("#")
     ]
     return len(non_heading) > 5
@@ -115,7 +117,7 @@ def env_example_has_empty_secrets():
     for line in env_example.read_text(errors="replace").splitlines():
         for key in ("POSTGRES_URL", "AZURE_STORAGE_CONNECTION_STRING"):
             if line.startswith(f"{key}="):
-                value = line[len(f"{key}="):].strip().strip("\"'")
+                value = line[len(f"{key}=") :].strip().strip("\"'")
                 if value:
                     return False
     return True
@@ -180,6 +182,7 @@ def has_non_autograder_workflow():
 # Check groups
 # ---------------------------------------------------------------------------
 
+
 def check_file_structure():
     results = []
 
@@ -197,22 +200,27 @@ def check_file_structure():
         ("src/storage.py", False),
     ]:
         label = f"File exists: {path}"
-        results.append(ok(label, critical) if file_exists(path) else fail(label, critical))
+        results.append(
+            ok(label, critical) if file_exists(path) else fail(label, critical)
+        )
 
     tests_dir = ROOT / "tests"
     has_test_file = tests_dir.is_dir() and bool(list(tests_dir.rglob("test_*.py")))
     results.append(
-        ok("tests/ has at least one test_*.py") if has_test_file
+        ok("tests/ has at least one test_*.py")
+        if has_test_file
         else fail("tests/ has at least one test_*.py")
     )
 
     results.append(
-        ok("README.md has been filled in") if readme_is_filled_in()
+        ok("README.md has been filled in")
+        if readme_is_filled_in()
         else fail("README.md has been filled in")
     )
 
     results.append(
-        ok("AI_ASSIST.md has been filled in") if ai_assist_is_filled_in()
+        ok("AI_ASSIST.md has been filled in")
+        if ai_assist_is_filled_in()
         else fail("AI_ASSIST.md has been filled in")
     )
 
@@ -232,18 +240,21 @@ def check_code_patterns():
 
     pydantic_lines = grep_src(r"BaseModel|import pydantic|from pydantic")
     results.append(
-        ok("Pydantic BaseModel used in src/", critical=True) if pydantic_lines
+        ok("Pydantic BaseModel used in src/", critical=True)
+        if pydantic_lines
         else fail("Pydantic BaseModel used in src/", critical=True)
     )
 
     sys_exit_lines = grep_src(r"\bsys\.exit\b")
     results.append(
-        ok("sys.exit present in src/ (fail-fast on missing env vars)") if sys_exit_lines
+        ok("sys.exit present in src/ (fail-fast on missing env vars)")
+        if sys_exit_lines
         else fail("sys.exit present in src/ (fail-fast on missing env vars)")
     )
 
     results.append(
-        ok("No bare print() in src/ (logging used instead)") if no_bare_print_in_src()
+        ok("No bare print() in src/ (logging used instead)")
+        if no_bare_print_in_src()
         else fail("No bare print() in src/ (logging used instead)")
     )
 
@@ -254,18 +265,23 @@ def check_security():
     results = []
 
     results.append(
-        ok(".env not committed", critical=True) if not (ROOT / ".env").exists()
-        else fail(".env not committed", critical=True, detail=".env found in working tree")
+        ok(".env not committed", critical=True)
+        if not (ROOT / ".env").exists()
+        else fail(
+            ".env not committed", critical=True, detail=".env found in working tree"
+        )
     )
 
     results.append(
-        ok(".env.example has empty values for secret keys") if env_example_has_empty_secrets()
+        ok(".env.example has empty values for secret keys")
+        if env_example_has_empty_secrets()
         else fail(".env.example has empty values for secret keys")
     )
 
     clean, detail = no_hardcoded_secrets()
     results.append(
-        ok("No hardcoded secrets in src/", critical=True) if clean
+        ok("No hardcoded secrets in src/", critical=True)
+        if clean
         else fail("No hardcoded secrets in src/", critical=True, detail=detail)
     )
 
@@ -277,13 +293,17 @@ def check_tests(pytest_exit_code):
 
     fn_count = count_test_functions()
     results.append(
-        ok(f"At least 2 test functions found ({fn_count} total)") if fn_count >= 2
+        ok(f"At least 2 test functions found ({fn_count} total)")
+        if fn_count >= 2
         else fail(f"At least 2 test functions found (only {fn_count} found)")
     )
 
     results.append(
-        ok("pytest passes", critical=True) if pytest_exit_code == 0
-        else fail("pytest passes", critical=True, detail=f"exit code {pytest_exit_code}")
+        ok("pytest passes", critical=True)
+        if pytest_exit_code == 0
+        else fail(
+            "pytest passes", critical=True, detail=f"exit code {pytest_exit_code}"
+        )
     )
 
     return results
@@ -292,7 +312,8 @@ def check_tests(pytest_exit_code):
 def check_cicd():
     results = []
     results.append(
-        ok("CI workflow exists (.github/workflows/)") if has_non_autograder_workflow()
+        ok("CI workflow exists (.github/workflows/)")
+        if has_non_autograder_workflow()
         else fail("CI workflow exists (.github/workflows/)")
     )
     return results
@@ -302,7 +323,8 @@ def check_git_workflow():
     results = []
     merge_count = merge_commit_count()
     results.append(
-        ok(f"At least 3 PRs merged ({merge_count} merge commits on main)") if merge_count >= 3
+        ok(f"At least 3 PRs merged ({merge_count} merge commits on main)")
+        if merge_count >= 3
         else fail(f"At least 3 PRs merged ({merge_count} merge commits found)")
     )
     return results
@@ -327,6 +349,7 @@ MANUAL_CHECKS = [
 # ---------------------------------------------------------------------------
 # Markdown summary
 # ---------------------------------------------------------------------------
+
 
 def build_markdown(all_results, score, total):
     lines = [
@@ -357,6 +380,7 @@ def build_markdown(all_results, score, total):
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main():
     try:

@@ -21,8 +21,8 @@ def insert_readings(df: pd.DataFrame) -> None:
 
     with closing(psycopg2.connect(db_url)) as conn:
         with conn.cursor() as cur:
-            cur.execute(f"CREATE SCHEMA IF NOT EXISTS {schema}") 
-            cur.execute(f"SET search_path TO {schema}")  
+            cur.execute(f"CREATE SCHEMA IF NOT EXISTS {schema}")
+            cur.execute(f"SET search_path TO {schema}")
 
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS weather_readings (
@@ -55,7 +55,7 @@ def insert_readings(df: pd.DataFrame) -> None:
                         float(row["precipitation"]),
                         float(row["wind_speed"]),
                         float(row["wind_speed_ms"]),
-                        bool(row["is_raining"])
+                        bool(row["is_raining"]),
                     ),
                 )
 
@@ -83,5 +83,3 @@ def upload_raw_json(raw_data) -> None:
         overwrite=True,
     )
     log.info("Uploaded raw data to blob: %s", blob_name)
-#ON CONFLICT (city, timestamp) DO NOTHING
-#UNIQUE(city, timestamp)
