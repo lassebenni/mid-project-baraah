@@ -65,7 +65,7 @@ def insert_readings(df: pd.DataFrame) -> None:
     log.info("Inserted %d rows into %s.weather_readings", len(df), schema)
 
 
-def upload_raw_json(raw_data) -> None:
+def upload_raw_json(raw_data: list[dict]) -> None:
     """Upload raw API response to Blob Storage as a JSON backup."""
     conn_str = os.environ["AZURE_STORAGE_CONNECTION_STRING"]
     client = BlobServiceClient.from_connection_string(conn_str)
